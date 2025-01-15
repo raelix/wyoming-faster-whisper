@@ -33,16 +33,16 @@ setup(
     packages=setuptools.find_packages(),
     package_data={module_name: [str(p.relative_to(module_dir)) for p in data_files]},
     install_requires=requirements,
+    python_requires=">=3.9,<3.13",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
         "Topic :: Text Processing :: Linguistic",
         "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
     ],
     keywords="rhasspy wyoming whisper stt",
     entry_points={

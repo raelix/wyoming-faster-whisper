@@ -5,9 +5,9 @@ import logging
 import os
 import tempfile
 import wave
-from typing import Optional
+from typing import Optional, Any
 
-import faster_whisper
+from mlx_whisper.transcribe import transcribe
 from wyoming.asr import Transcribe, Transcript
 from wyoming.audio import AudioChunk, AudioStop
 from wyoming.event import Event
@@ -24,7 +24,7 @@ class FasterWhisperEventHandler(AsyncEventHandler):
         self,
         wyoming_info: Info,
         cli_args: argparse.Namespace,
-        model: faster_whisper.WhisperModel,
+        model_path: str,  # Changed: now we expect the model path instead of the loaded model
         model_lock: asyncio.Lock,
         *args,
         initial_prompt: Optional[str] = None,
@@ -34,7 +34,7 @@ class FasterWhisperEventHandler(AsyncEventHandler):
 
         self.cli_args = cli_args
         self.wyoming_info_event = wyoming_info.event()
-        self.model = model
+        self.model_path = model_path  # Store the model path
         self.model_lock = model_lock
         self.initial_prompt = initial_prompt
         self._language = self.cli_args.language
@@ -66,14 +66,19 @@ class FasterWhisperEventHandler(AsyncEventHandler):
             self._wav_file = None
 
             async with self.model_lock:
-                segments, _info = self.model.transcribe(
-                    self._wav_path,
-                    beam_size=self.cli_args.beam_size,
-                    language=self._language,
-                    initial_prompt=self.initial_prompt,
+                # Let transcribe() handle model loading via path_or_hf_repo
+                result = transcribe(
+                    audio=self._wav_path,
+                    path_or_hf_repo=self.model_path,  # Pass the model path instead of model
+                    language=self._language if self._language else None,
+                    task="transcribe",
+                    initial_prompt=self.initial_prompt if self.initial_prompt else None,
+                    condition_on_previous_text=True,
+                    temperature=0.0,
+                    verbose=False
                 )
 
-            text = " ".join(segment.text for segment in segments)
+            text = result["text"].strip()
             _LOGGER.info(text)
 
             await self.write_event(Transcript(text=text).event())

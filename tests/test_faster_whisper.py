@@ -33,8 +33,6 @@ async def test_faster_whisper() -> None:
         "stdio://",
         "--model",
         "tiny-int8",
-        "--data-dir",
-        str(_LOCAL_DIR),
         "--language",
         "en",
         stdin=PIPE,

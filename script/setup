@@ -1,8 +1,32 @@
 #!/usr/bin/env python3
 import argparse
 import subprocess
+import sys
 import venv
 from pathlib import Path
+
+def find_compatible_python():
+    """Find a compatible Python interpreter (3.9-3.12)."""
+    # Try to find Python versions
+    for version in ["3.12", "3.11", "3.10", "3.9"]:
+        try:
+            # Try to find python in common locations
+            for cmd in [f"python{version}", f"python3.{version}"]:
+                try:
+                    result = subprocess.run(
+                        [cmd, "--version"],
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    if result.returncode == 0:
+                        return cmd
+                except (subprocess.SubprocessError, FileNotFoundError):
+                    continue
+        except Exception:
+            continue
+    
+    return None
 
 _DIR = Path(__file__).parent
 _PROGRAM_DIR = _DIR.parent
@@ -12,21 +36,41 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--dev", action="store_true", help="Install dev requirements")
 args = parser.parse_args()
 
-# Create virtual environment
-builder = venv.EnvBuilder(with_pip=True)
-context = builder.ensure_directories(_VENV_DIR)
-builder.create(_VENV_DIR)
+# Find compatible Python version
+python_path = find_compatible_python()
+if not python_path:
+    print("Error: No compatible Python version found (need 3.9-3.12)", file=sys.stderr)
+    sys.exit(1)
 
-# Upgrade dependencies
-pip = [context.env_exe, "-m", "pip"]
-subprocess.check_call(pip + ["install", "--upgrade", "pip"])
-subprocess.check_call(pip + ["install", "--upgrade", "setuptools", "wheel"])
+print(f"Using Python: {python_path}")
+
+# Remove existing venv if it exists
+if _VENV_DIR.exists():
+    import shutil
+    shutil.rmtree(_VENV_DIR)
+
+# Create virtual environment with specific Python version
+try:
+    subprocess.run([python_path, "-m", "venv", str(_VENV_DIR)], check=True)
+except subprocess.SubprocessError as e:
+    print(f"Error creating virtual environment: {e}", file=sys.stderr)
+    sys.exit(1)
+
+# Get the Python executable from the new venv
+if sys.platform == "win32":
+    venv_python = _VENV_DIR / "Scripts" / "python.exe"
+    venv_pip = _VENV_DIR / "Scripts" / "pip.exe"
+else:
+    venv_python = _VENV_DIR / "bin" / "python"
+    venv_pip = _VENV_DIR / "bin" / "pip"
+
+# Upgrade dependencies using the venv Python
+subprocess.check_call([str(venv_pip), "install", "--upgrade", "pip"])
+subprocess.check_call([str(venv_pip), "install", "--upgrade", "setuptools", "wheel"])
 
 # Install requirements
-subprocess.check_call(pip + ["install", "-r", str(_PROGRAM_DIR / "requirements.txt")])
+subprocess.check_call([str(venv_pip), "install", "-r", str(_PROGRAM_DIR / "requirements.txt")])
 
 if args.dev:
     # Install dev requirements
-    subprocess.check_call(
-        pip + ["install", "-r", str(_PROGRAM_DIR / "requirements_dev.txt")]
-    )
+    subprocess.check_call([str(venv_pip), "install", "-r", str(_PROGRAM_DIR / "requirements_dev.txt")])

@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  wyoming-mlx-whisper:
+    build: .
+    ports:
+      - "10300:10300"
+    environment:
+      - MODEL=mlx-community/whisper-large-v3
+      - LANGUAGE=en
+    volumes:
+      # Persist HuggingFace cache
+      - huggingface_cache:/home/wyoming/.cache/huggingface/hub
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "10300"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  huggingface_cache: 

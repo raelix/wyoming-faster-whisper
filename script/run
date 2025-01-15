@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
-import sys
 import subprocess
-import venv
+import sys
 from pathlib import Path
 
 _DIR = Path(__file__).parent
 _PROGRAM_DIR = _DIR.parent
 _VENV_DIR = _PROGRAM_DIR / ".venv"
 
-context = venv.EnvBuilder().ensure_directories(_VENV_DIR)
-subprocess.check_call([context.env_exe, "-m", "wyoming_faster_whisper"] + sys.argv[1:])
+# Get the Python executable from the venv
+if sys.platform == "win32":
+    venv_python = _VENV_DIR / "Scripts" / "python.exe"
+else:
+    venv_python = _VENV_DIR / "bin" / "python"
+
+# Run the module using the venv Python
+try:
+    subprocess.check_call([str(venv_python), "-m", "wyoming_faster_whisper"] + sys.argv[1:])
+except FileNotFoundError:
+    print("Error: Virtual environment not found. Please run ./script/setup first", file=sys.stderr)
+    sys.exit(1)
+except subprocess.CalledProcessError as e:
+    sys.exit(e.returncode)
