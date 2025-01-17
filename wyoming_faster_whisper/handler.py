@@ -7,7 +7,7 @@ import tempfile
 import wave
 from typing import Optional, Any
 
-from mlx_whisper.transcribe import transcribe
+from mlx_whisper import transcribe
 from wyoming.asr import Transcribe, Transcript
 from wyoming.audio import AudioChunk, AudioStop
 from wyoming.event import Event
@@ -24,7 +24,7 @@ class FasterWhisperEventHandler(AsyncEventHandler):
         self,
         wyoming_info: Info,
         cli_args: argparse.Namespace,
-        model_path: str,  # Changed: now we expect the model path instead of the loaded model
+        model_path: str,
         model_lock: asyncio.Lock,
         *args,
         initial_prompt: Optional[str] = None,
@@ -36,7 +36,6 @@ class FasterWhisperEventHandler(AsyncEventHandler):
         self.wyoming_info_event = wyoming_info.event()
         self.model_path = model_path  # Store the model path
         self.model_lock = model_lock
-        self.initial_prompt = initial_prompt
         self._language = self.cli_args.language
         self._wav_dir = tempfile.TemporaryDirectory()
         self._wav_path = os.path.join(self._wav_dir.name, "speech.wav")
@@ -56,26 +55,22 @@ class FasterWhisperEventHandler(AsyncEventHandler):
             return True
 
         if AudioStop.is_type(event.type):
-            _LOGGER.debug(
-                "Audio stopped. Transcribing with initial prompt=%s",
-                self.initial_prompt,
-            )
+
             assert self._wav_file is not None
 
             self._wav_file.close()
             self._wav_file = None
+            decode_options=dict(language="it")
 
             async with self.model_lock:
                 # Let transcribe() handle model loading via path_or_hf_repo
                 result = transcribe(
                     audio=self._wav_path,
                     path_or_hf_repo=self.model_path,  # Pass the model path instead of model
-                    language=self._language if self._language else None,
-                    task="transcribe",
-                    initial_prompt=self.initial_prompt if self.initial_prompt else None,
                     condition_on_previous_text=True,
                     temperature=0.0,
-                    verbose=False
+                    verbose=False,
+                    **decode_options,
                 )
 
             text = result["text"].strip()
@@ -84,16 +79,13 @@ class FasterWhisperEventHandler(AsyncEventHandler):
             await self.write_event(Transcript(text=text).event())
             _LOGGER.debug("Completed request")
 
-            # Reset
-            self._language = self.cli_args.language
-
             return False
 
         if Transcribe.is_type(event.type):
-            transcribe = Transcribe.from_event(event)
-            if transcribe.language:
-                self._language = transcribe.language
-                _LOGGER.debug("Language set to %s", transcribe.language)
+            transcribe_ev = Transcribe.from_event(event)
+            if transcribe_ev.language:
+                self._language = transcribe_ev.language
+                _LOGGER.debug("Language set to %s", transcribe_ev.language)
             return True
 
         if Describe.is_type(event.type):

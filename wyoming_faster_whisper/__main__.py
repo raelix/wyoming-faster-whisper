@@ -158,7 +158,7 @@ async def main() -> None:
     if match:
         model_size = match.group(1)
         # MLX Whisper uses different model names
-        args.model = model_size
+        # args.model = model_size
 
     if args.language == "auto":
         # Whisper does not understand "auto"
@@ -194,13 +194,13 @@ async def main() -> None:
 
     # Load model to verify it works, but we'll let transcribe() handle the actual loading
     _LOGGER.debug("Loading %s", args.model)
-    try:
-        # Just verify the model can be loaded
-        _ = load_model(args.model)
-        model_path = args.model  # Store the path instead of the loaded model
-    except Exception as e:
-        _LOGGER.error("Failed to load model: %s", str(e))
-        raise
+    # try:
+    #     # Just verify the model can be loaded
+    #     _ = load_model(args.model)
+    #     model_path = args.model  # Store the path instead of the loaded model
+    # except Exception as e:
+    #     _LOGGER.error("Failed to load model: %s", str(e))
+    #     raise
 
     server = AsyncServer.from_uri(args.uri)
     _LOGGER.info("Ready")
@@ -210,7 +210,7 @@ async def main() -> None:
             FasterWhisperEventHandler,
             wyoming_info,
             args,
-            model_path,  # Pass the model path instead of loaded model
+            args.model, 
             model_lock,
             initial_prompt=args.initial_prompt,
         )
